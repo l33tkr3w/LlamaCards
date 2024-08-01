@@ -28,7 +28,7 @@ LlamaCards is a web application that provides a dynamic interface for interactin
 
 1. **Clone the Repository**:
     bash
-    git clone https://github.com/your-username/llamacards-webapp.git
+    git clone https://github.com/l33tkr3w/llamacards.git
     cd llamacards-webapp
     
 
