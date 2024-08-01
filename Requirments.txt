@@ -1,0 +1,4 @@
+aiohttp==3.8.1
+asyncio==3.4.3
+quart==0.14.1
+quart-cors==0.2.3
