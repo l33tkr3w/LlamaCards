@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LlamaCards</title>
     <style>
-        
+        /* Your existing CSS styles */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -15,7 +15,7 @@
             user-select: none;
             overflow: hidden;
         }
-        
+        /* ... other styles */
         #app {
             display: flex;
             height: 100vh;
@@ -348,7 +348,7 @@
             </div>
         </div>
         <div id="main">
-            <div id="canvas-container">
+            <div id="canvas-container" onmousedown="startPan(event)" onmousemove="pan(event)" onmouseup="stopPan()" onwheel="zoom(event)">
                 <div id="canvas">
                     <svg id="connections"></svg>
                 </div>
@@ -420,7 +420,7 @@
 
         async function processCardMessage(card, message, engine, processedCards = new Set()) {
             if (processedCards.has(card)) {
-                //return;
+                //return; //Infinite loop allowed. uncomment to disable
             }
             processedCards.add(card);
 
@@ -645,7 +645,7 @@
         }
 
         window.removeCard = function(card) {
-            connections = connections.filter(conn => conn.from.closest('.card') !== card && conn.to.closest('..card') !== card);
+            connections = connections.filter(conn => conn.from.closest('.card') !== card && conn.to.closest('.card') !== card);
             cards = cards.filter(c => c !== card);
             card.remove();
             updateExpectedInputs();
@@ -704,42 +704,42 @@
             connectionsSVG.appendChild(path);
         }
 
-        window.zoomIn = function() {
-            zoom *= 1.1;
+        window.zoom = function(event) {
+            event.preventDefault();
+            if (event.deltaY < 0) {
+                zoom *= 1.1;
+            } else {
+                zoom /= 1.1;
+            }
             applyZoom();
         }
 
-        window.zoomOut = function() {
-            zoom /= 1.1;
-            applyZoom();
-        }
-
-        function applyZoom() {
+        window.applyZoom = function() {
             canvas.style.transform = `scale(${zoom})`;
             drawConnections();
         }
 
-        canvasContainer.addEventListener('mousedown', (event) => {
-            if (event.button === 1 || event.button === 2) {
+        window.startPan = function(event) {
+            if (event.button === 0) {  // Left mouse button
                 isPanning = true;
                 startX = event.clientX - offsetX;
                 startY = event.clientY - offsetY;
                 canvasContainer.style.cursor = 'grabbing';
             }
-        });
+        }
 
-        canvasContainer.addEventListener('mousemove', (event) => {
+        window.pan = function(event) {
             if (isPanning) {
                 offsetX = event.clientX - startX;
                 offsetY = event.clientY - startY;
                 canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${zoom})`;
             }
-        });
+        }
 
-        canvasContainer.addEventListener('mouseup', () => {
+        window.stopPan = function() {
             isPanning = false;
             canvasContainer.style.cursor = 'grab';
-        });
+        }
 
         window.showContextMenu = function(event) {
             event.preventDefault();
@@ -807,7 +807,7 @@
                     },
                     to: {
                         cardIndex: cards.indexOf(conn.to.closest('.card')),
-                        pointClass: Array.from(conn.to.classList).find(cls.includes('-point'))
+                        pointClass: Array.from(conn.to.classList).find(cls => cls.includes('-point'))
                     }
                 }))
             };
@@ -820,11 +820,11 @@
             document.getElementById('save-layout-popup').style.display = 'none';
         }
 
-        function loadLayoutsFromCookies() {
+        window.loadLayoutsFromCookies = function() {
             updateLayoutList();
         }
 
-        function updateLayoutList() {
+        window.updateLayoutList = function() {
             const layouts = JSON.parse(getCookie('layouts') || '{}');
             const layoutList = document.getElementById('layout-list');
             layoutList.innerHTML = '';
@@ -843,12 +843,12 @@
             });
         }
 
-        function setCookie(name, value, days) {
+        window.setCookie = function(name, value, days) {
             const expires = new Date(Date.now() + days * 864e5).toUTCString();
             document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/';
         }
 
-        function getCookie(name) {
+        window.getCookie = function(name) {
             return document.cookie.split('; ').reduce((r, v) => {
                 const parts = v.split('=');
                 return parts[0] === name ? decodeURIComponent(parts[1]) : r;
