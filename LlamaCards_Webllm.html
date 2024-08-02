@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LlamaCards</title>
+    <style>
+        /* Your existing CSS styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            user-select: none;
+            overflow: hidden;
+        }
+        /* ... other styles */
+        #app {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 200px;
+            background-color: #252526;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #main {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            cursor: grab;
+            overflow: hidden;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 10000px;
+            height: 10000px;
+            transform-origin: 0 0;
+        }
+
+        #connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .card {
+            background-color: #333333;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            margin-bottom: 15px;
+            position: absolute;
+            width: 225px;
+            z-index: 2;
+            resize: both;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            border-bottom: 2px solid #ffffff;
+            cursor: grab;
+            border-radius: 8px 8px 0 0;
+            background-color: #1e1e1e;
+        }
+
+        .card-header.llm {
+            background-color: #004060;
+        }
+
+        .card-header.prompt {
+            background-color: #7a3d00;
+        }
+
+        .card-title {
+            font-weight: bold;
+        }
+
+        .card-body {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+            user-select: text;
+        }
+
+        .connection-point {
+            width: 0;
+            height: 0;
+            border-style: solid;
+            cursor: pointer;
+            position: absolute;
+            z-index: 3;
+        }
+
+        .input-point {
+            border-width: 8px 8px 8px 0;
+            border-color: transparent #d9534f transparent transparent;
+        }
+
+        .output-point {
+            border-width: 8px 0 8px 8px;
+            border-color: transparent transparent transparent #007acc;
+        }
+
+        .top-input-point {
+            top: -4px;
+            left: 48%;
+            transform: translateX(-50%) rotate(-90deg);
+        }
+
+        .top-output-point {
+            top: -4px;
+            left: 52%;
+            transform: translateX(-50%) rotate(-90deg);
+        }
+
+        .bottom-input-point {
+            bottom: -4px;
+            left: 52%;
+            transform: translateX(-50%) rotate(90deg);
+        }
+
+        .bottom-output-point {
+            bottom: -4px;
+            left: 48%;
+            transform: translateX(-50%) rotate(90deg);
+        }
+
+        .left-input-point {
+            left: -0px;
+            top: 52%;
+            transform: translateY(-50%) rotate(180deg);
+        }
+
+        .left-output-point {
+            left: -0px;
+            top: 48%;
+            transform: translateY(-50%) rotate(180deg);
+        }
+
+        .right-input-point {
+            right: -0px;
+            top: 48%;
+            transform: translateY(-50%) rotate(0deg);
+        }
+
+        .right-output-point {
+            right: -0px;
+            top: 52%;
+            transform: translateY(-50%);
+        }
+
+        textarea, .response-area, input {
+            width: 100%;
+            background-color: #3c3c3c;
+            color: #ffffff;
+            border: 1px solid #555;
+            box-sizing: border-box;
+        }
+
+        .prompt-area {
+            height: 37.5px;
+        }
+
+        .response-area {
+            height: 75px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .response-area pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+
+        button, select {
+            background-color: #0e639c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover, select:hover {
+            background-color: #1177bb;
+        }
+
+        .resize-button {
+            width: 15px;
+            height: 15px;
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            cursor: se-resize;
+            background-color: #ffffff;
+        }
+
+        .context-menu {
+            position: absolute;
+            background-color: #3c3c3c;
+            border: 1px solid #555;
+            padding: 5px 0;
+            z-index: 1000;
+        }
+
+        .context-menu-item {
+            padding: 5px 20px;
+            cursor: pointer;
+        }
+
+        .context-menu-item:hover {
+            background-color: #4c4c4c;
+        }
+
+        @keyframes highlight {
+            0% {
+                box-shadow: 0 0 5px 5px rgba(0, 122, 204, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 15px 15px rgba(0, 122, 204, 0.5);
+            }
+            100% {
+                box-shadow: 0 0 5px 5px rgba(0, 122, 204, 0.5);
+            }
+        }
+
+        .card.processing {
+            animation: highlight 0.75s infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -5;
+            }
+        }
+
+        .connection {
+            stroke: #007acc;
+            stroke-width: 2;
+            fill: none;
+            stroke-dasharray: 5, 5;
+            animation: dash 0.25s linear infinite;
+        }
+
+        .bottom-controls {
+            margin-top: auto;
+            padding: 10px;
+            border-top: 1px solid #555;
+            background-color: #1e1e1e;
+        }
+
+        .layout-list-container {
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 10px;
+            background-color: #2e2e2e;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .layout-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .layout-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+        }
+
+        .layout-list-item span {
+            flex-grow: 1;
+        }
+
+        .layout-list-item button {
+            background-color: #d9534f;
+            margin-left: 5px;
+        }
+
+        .layout-list-item button:hover {
+            background-color: #c9302c;
+        }
+
+        .footer-text {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #ffffff;
+            font-size: 12px;
+            z-index: 1000;
+        }
+
+        .disabled {
+            pointer-events: none;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="disabled">
+        <div id="sidebar">
+            <div>
+                <h2>LlamaCards</h2>
+                <button onclick="clearTable()">Clear Table</button>
+                <button onclick="clearCardContent()">Clear Card Content</button>
+            </div>
+            <div class="bottom-controls">
+                <button onclick="showSaveLayoutPopup()">Save Layout</button>
+                <div id="save-layout-popup" style="display: none;">
+                    <input type="text" id="layout-name" placeholder="Enter layout name">
+                    <button onclick="saveLayout()">Save</button>
+                </div>
+                <div class="layout-list-container">
+                    <ul id="layout-list" class="layout-list"></ul>
+                </div>
+            </div>
+        </div>
+        <div id="main">
+            <div id="canvas-container">
+                <div id="canvas">
+                    <svg id="connections"></svg>
+                </div>
+            </div>
+            <div class="footer-text">LlamaCards by Cory Hafer</div>
+        </div>
+    </div>
+
+    <div id="context-menu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" onclick="createCard(event, 'llm')">LLM Card</div>
+        <div class="context-menu-item" onclick="createCard(event, 'prompt')">Prompt Card</div>
+    </div>
+
+    <script type="module">
+        import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+        // Global variables
+        let cards = [];
+        let connections = [];
+        let draggedPoint = null;
+        let zoom = 1;
+        let isPanning = false;
+        let startX, startY, offsetX = 0, offsetY = 0;
+        let isDraggingCard = false;
+        let currentDraggedCard = null;
+        let engine;
+
+        const connectionsSVG = document.getElementById('connections');
+        const main = document.getElementById('main');
+        const canvasContainer = document.getElementById('canvas-container');
+        const canvas = document.getElementById('canvas');
+        const contextMenu = document.getElementById('context-menu');
+
+        async function initWebLLM() {
+            const { CreateMLCEngine } = webllm;
+
+            const initProgressCallback = (progress) => {
+                console.log('Loading model:', progress);
+            };
+
+            engine = await CreateMLCEngine('gemma-2-2b-it-q4f16_1-MLC', {
+                initProgressCallback
+            });
+
+            // Enable interactions after model is loaded
+            document.getElementById('app').classList.remove('disabled');
+        }
+
+        async function handleChat(engine, userMessage) {
+            const messages = [
+                { role: 'system', content: 'You are a helpful AI assistant.' },
+                { role: 'user', content: userMessage }
+            ];
+
+            const reply = await engine.chat.completions.create({ messages });
+            return reply.choices[0].message.content;
+        }
+
+        window.sendMessage = async function(card) {
+            const textarea = card.querySelector('.message-area');
+            if (textarea) {
+                const message = textarea.value.trim();
+                if (message) {
+                    await processCardMessage(card, message, engine);
+                    textarea.value = '';
+                }
+            }
+        }
+
+        async function processCardMessage(card, message, engine, processedCards = new Set()) {
+            if (processedCards.has(card)) {
+                //return;
+            }
+            processedCards.add(card);
+
+            const prompt = card.dataset.prompt || '';
+            const combinedInput = `${prompt}${message}`;
+
+            card.classList.add('processing');
+            try {
+                const response = await handleChat(engine, combinedInput);
+                streamResponse(card, response);
+
+                const connectedCards = connections
+                    .filter(conn => conn.from.closest('.card') === card)
+                    .map(conn => conn.to.closest('.card'));
+
+                for (const nextCard of connectedCards) {
+                    nextCard.dataset.inputsReceived++;
+                    nextCard.dataset.responses += response + '\n';
+                    if (parseInt(nextCard.dataset.inputsReceived, 10) >= parseInt(nextCard.dataset.expectedInputs, 10)) {
+                        const combinedResponse = nextCard.dataset.responses.trim();
+                        nextCard.dataset.responses = '';
+                        nextCard.dataset.inputsReceived = 0;
+                        await processCardMessage(nextCard, combinedResponse, engine, processedCards);
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing message:', error);
+                streamResponse(card, 'Error: Unable to process message');
+            } finally {
+                card.classList.remove('processing');
+            }
+        }
+
+        function streamResponse(card, response) {
+            const outputArea = card.querySelector('.response-area');
+            if (outputArea) {
+                outputArea.innerHTML += `<pre>${response}</pre>`;
+                outputArea.scrollTop = outputArea.scrollHeight;
+                card.classList.remove('processing'); // Stop animation
+            }
+        }
+
+        window.createCard = function(event, type) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            const canvasRect = canvas.getBoundingClientRect();
+            card.style.left = `${(event.clientX - canvasRect.left) / zoom}px`;
+            card.style.top = `${(event.clientY - canvasRect.top) / zoom}px`;
+            card.dataset.inputsReceived = 0;
+            card.dataset.expectedInputs = 0;
+            card.dataset.responses = '';
+            let cardContent = '';
+
+            switch (type) {
+                case 'llm':
+                    card.dataset.model = 'gemma-2-2b-it-q4f16_1-MLC';
+                    card.dataset.prompt = '';
+                    card.dataset.message = '';
+                    cardContent = `
+                        <div class="card-header llm" onmousedown="startDragCard(event, this)">
+                            <span class="card-title">LLM Card ${cards.length + 1}</span>
+                            <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                        </div>
+                        <div class="card-body">
+                            <textarea class="prompt-area" placeholder="Enter prompt" onchange="updateCardPrompt(this)"></textarea>
+                            <textarea class="message-area" placeholder="Enter your message"></textarea>
+                            <button onclick="sendMessage(this.parentNode.parentNode)">Send</button>
+                            <div class="response-area"></div>
+                        </div>`;
+                    break;
+                case 'prompt':
+                    cardContent = `
+                        <div class="card-header prompt" onmousedown="startDragCard(event, this)">
+                            <span class="card-title">Prompt Card ${cards.length + 1}</span>
+                            <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                        </div>
+                        <div class="card-body">
+                            <input type="text" class="prompt-input" placeholder="Enter prompt">
+                            <input type="text" class="message-input" placeholder="Enter message">
+                            <button onclick="sendPrompt(this.parentNode.parentNode)">Send</button>
+                        </div>`;
+                    break;
+            }
+
+            card.innerHTML = cardContent;
+            card.innerHTML += `
+                <div class="connection-point input-point top-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="connection-point output-point top-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="connection-point input-point bottom-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="connection-point output-point bottom-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="connection-point input-point left-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="connection-point output-point left-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="connection-point input-point right-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="connection-point output-point right-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                <div class="resize-button" onmousedown="startResize(event, this)"></div>`;
+            canvas.appendChild(card);
+            cards.push(card);
+            updateExpectedInputs();
+            hideContextMenu();
+        }
+
+        window.clearTable = function() {
+            cards.forEach(card => card.remove());
+            cards = [];
+            connections = [];
+            connectionsSVG.innerHTML = '';
+        }
+
+        window.clearCardContent = function() {
+            cards.forEach(card => {
+                const responseArea = card.querySelector('.response-area');
+                if (responseArea) {
+                    responseArea.innerHTML = '';
+                }
+            });
+        }
+
+        window.startDragCard = function(event, header) {
+            event.stopPropagation();
+            const card = header.parentElement;
+            isDraggingCard = true;
+            currentDraggedCard = card;
+            startX = event.clientX - card.offsetLeft * zoom;
+            startY = event.clientY - card.offsetTop * zoom;
+
+            document.addEventListener('mousemove', dragCard);
+            document.addEventListener('mouseup', stopDragCard);
+        }
+
+        window.dragCard = function(event) {
+            if (!isDraggingCard) return;
+            const newX = (event.clientX - startX) / zoom;
+            const newY = (event.clientY - startY) / zoom;
+            currentDraggedCard.style.left = `${newX}px`;
+            currentDraggedCard.style.top = `${newY}px`;
+            drawConnections();
+        }
+
+        window.stopDragCard = function() {
+            isDraggingCard = false;
+            currentDraggedCard = null;
+            document.removeEventListener('mousemove', dragCard);
+            document.removeEventListener('mouseup', stopDragCard);
+        }
+
+        window.startDrag = function(event, type) {
+            event.stopPropagation();
+            event.preventDefault();
+            draggedPoint = { element: event.target, type: type };
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        window.drag = function(event) {
+            if (!draggedPoint) return;
+            drawConnections(event.clientX, event.clientY);
+        }
+
+        window.stopDrag = function(event) {
+            if (!draggedPoint) return;
+            const targetPoint = findTargetPoint(event);
+            if (targetPoint && targetPoint.type === 'input' && draggedPoint.type === 'output') {
+                const connection = {
+                    from: draggedPoint.element,
+                    to: targetPoint.element
+                };
+                connections.push(connection);
+                updateExpectedInputs();
+            }
+            draggedPoint = null;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', stopDrag);
+            drawConnections();
+        }
+
+        window.disconnectDot = function(event, element) {
+            event.stopPropagation();
+            connections = connections.filter(conn => conn.from !== element && conn.to !== element);
+            updateExpectedInputs();
+            drawConnections();
+        }
+
+        window.sendPrompt = async function(card) {
+            const promptInput = card.querySelector('.prompt-input');
+            const messageInput = card.querySelector('.message-input');
+            if (promptInput && messageInput) {
+                const prompt = promptInput.value.trim();
+                const message = messageInput.value.trim();
+                if (prompt || message) {
+                    await forwardPrompt(card, prompt, message);
+                }
+            }
+        }
+
+        async function forwardPrompt(card, prompt, message) {
+            const connectedCards = connections
+                .filter(conn => conn.from.closest('.card') === card)
+                .map(conn => conn.to.closest('.card'));
+
+            for (const nextCard of connectedCards) {
+                if (prompt) {
+                    nextCard.dataset.prompt = prompt;
+                    const promptArea = nextCard.querySelector('.prompt-area');
+                    if (promptArea) {
+                        promptArea.value = prompt;
+                    }
+                }
+                if (message) {
+                    nextCard.dataset.message = message;
+                    const messageArea = nextCard.querySelector('.message-area');
+                    if (messageArea) {
+                        messageArea.value = message;
+                    }
+                }
+                await sendMessage(nextCard);
+            }
+        }
+
+        window.updateCardPrompt = function(textarea) {
+            const card = textarea.closest('.card');
+            card.dataset.prompt = textarea.value;
+        }
+
+        window.removeCard = function(card) {
+            connections = connections.filter(conn => conn.from.closest('.card') !== card && conn.to.closest('..card') !== card);
+            cards = cards.filter(c => c !== card);
+            card.remove();
+            updateExpectedInputs();
+            drawConnections();
+        }
+
+        function updateExpectedInputs() {
+            cards.forEach(card => {
+                card.dataset.expectedInputs = connections.filter(conn => conn.to.closest('.card') === card).length;
+            });
+        }
+
+        function findTargetPoint(event) {
+            const points = document.querySelectorAll('.connection-point');
+            for (const point of points) {
+                const rect = point.getBoundingClientRect();
+                if (event.clientX >= rect.left && event.clientX <= rect.right &&
+                    event.clientY >= rect.top && event.clientY <= rect.bottom) {
+                    return { element: point, type: point.classList.contains('input-point') ? 'input' : 'output' };
+                }
+            }
+            return null;
+        }
+
+        function drawConnections(tempX, tempY) {
+            connectionsSVG.innerHTML = '';
+
+            for (const conn of connections) {
+                const fromRect = conn.from.getBoundingClientRect();
+                const toRect = conn.to.getBoundingClientRect();
+                const startX = (fromRect.left + fromRect.width / 2 - canvas.getBoundingClientRect().left) / zoom;
+                const startY = (fromRect.top + fromRect.height / 2 - canvas.getBoundingClientRect().top) / zoom;
+                const endX = (toRect.left + toRect.width / 2 - canvas.getBoundingClientRect().left) / zoom;
+                const endY = (toRect.top + toRect.height / 2 - canvas.getBoundingClientRect().top) / zoom;
+
+                drawBezierCurve(startX, startY, endX, endY);
+            }
+
+            if (draggedPoint && tempX !== undefined && tempY !== undefined) {
+                const rect = draggedPoint.element.getBoundingClientRect();
+                const startX = (rect.left + rect.width / 2 - canvas.getBoundingClientRect().left) / zoom;
+                const startY = (rect.top + rect.height / 2 - canvas.getBoundingClientRect().top) / zoom;
+                drawBezierCurve(startX, startY, (tempX - canvas.getBoundingClientRect().left) / zoom, (tempY - canvas.getBoundingClientRect().top) / zoom);
+            }
+        }
+
+        function drawBezierCurve(startX, startY, endX, endY) {
+            const controlPoint1X = startX + (endX - startX) / 3;
+            const controlPoint1Y = startY;
+            const controlPoint2X = startX + 2 * (endX - startX) / 3;
+            const controlPoint2Y = endY;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M${startX},${startY} C${controlPoint1X},${controlPoint1Y} ${controlPoint2X},${controlPoint2Y} ${endX},${endY}`);
+            path.setAttribute('class', 'connection');
+            connectionsSVG.appendChild(path);
+        }
+
+        window.zoomIn = function() {
+            zoom *= 1.1;
+            applyZoom();
+        }
+
+        window.zoomOut = function() {
+            zoom /= 1.1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            canvas.style.transform = `scale(${zoom})`;
+            drawConnections();
+        }
+
+        canvasContainer.addEventListener('mousedown', (event) => {
+            if (event.button === 1 || event.button === 2) {
+                isPanning = true;
+                startX = event.clientX - offsetX;
+                startY = event.clientY - offsetY;
+                canvasContainer.style.cursor = 'grabbing';
+            }
+        });
+
+        canvasContainer.addEventListener('mousemove', (event) => {
+            if (isPanning) {
+                offsetX = event.clientX - startX;
+                offsetY = event.clientY - startY;
+                canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${zoom})`;
+            }
+        });
+
+        canvasContainer.addEventListener('mouseup', () => {
+            isPanning = false;
+            canvasContainer.style.cursor = 'grab';
+        });
+
+        window.showContextMenu = function(event) {
+            event.preventDefault();
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = `${event.clientX}px`;
+            contextMenu.style.top = `${event.clientY}px`;
+        }
+
+        window.hideContextMenu = function() {
+            contextMenu.style.display = 'none';
+        }
+
+        window.startResize = function(event, resizeButton) {
+            event.stopPropagation();
+            const card = resizeButton.closest('.card');
+            const startWidth = card.offsetWidth;
+            const startHeight = card.offsetHeight;
+            const startX = event.clientX;
+            const startY = event.clientY;
+
+            function resize(event) {
+                const newWidth = startWidth + (event.clientX - startX);
+                const newHeight = startHeight + (event.clientY - startY);
+                card.style.width = `${newWidth}px`;
+                card.style.height = `${newHeight}px`;
+
+                const responseArea = card.querySelector('.response-area');
+                if (responseArea) {
+                    responseArea.style.height = `${newHeight - 112.5}px`;
+                }
+
+                drawConnections();
+            }
+
+            function stopResize() {
+                document.removeEventListener('mousemove', resize);
+                document.removeEventListener('mouseup', stopResize);
+            }
+
+            document.addEventListener('mousemove', resize);
+            document.addEventListener('mouseup', stopResize);
+        }
+
+        window.showSaveLayoutPopup = function() {
+            document.getElementById('save-layout-popup').style.display = 'block';
+        }
+
+        window.saveLayout = function() {
+            const layoutName = document.getElementById('layout-name').value.trim();
+            if (!layoutName) return;
+
+            const layoutData = {
+                cards: cards.map(card => ({
+                    type: card.querySelector('.card-header').classList.contains('llm') ? 'llm' : 'prompt',
+                    left: card.style.left,
+                    top: card.style.top,
+                    model: card.dataset.model || '',
+                    prompt: card.dataset.prompt || '',
+                    message: card.querySelector('.message-area') ? card.querySelector('.message-area').value : ''
+                })),
+                connections: connections.map(conn => ({
+                    from: {
+                        cardIndex: cards.indexOf(conn.from.closest('.card')),
+                        pointClass: Array.from(conn.from.classList).find(cls => cls.includes('-point'))
+                    },
+                    to: {
+                        cardIndex: cards.indexOf(conn.to.closest('.card')),
+                        pointClass: Array.from(conn.to.classList).find(cls.includes('-point'))
+                    }
+                }))
+            };
+
+            const layouts = JSON.parse(getCookie('layouts') || '{}');
+            layouts[layoutName] = layoutData;
+            setCookie('layouts', JSON.stringify(layouts), 365);
+
+            updateLayoutList();
+            document.getElementById('save-layout-popup').style.display = 'none';
+        }
+
+        function loadLayoutsFromCookies() {
+            updateLayoutList();
+        }
+
+        function updateLayoutList() {
+            const layouts = JSON.parse(getCookie('layouts') || '{}');
+            const layoutList = document.getElementById('layout-list');
+            layoutList.innerHTML = '';
+
+            Object.keys(layouts).forEach(name => {
+                const listItem = document.createElement('li');
+                listItem.className = 'layout-list-item';
+                listItem.innerHTML = `
+                    <span>${name}</span>
+                    <div>
+                        <button onclick="loadLayout('${name}')">Load</button>
+                        <button onclick="deleteLayout('${name}')">Delete</button>
+                    </div>
+                `;
+                layoutList.appendChild(listItem);
+            });
+        }
+
+        function setCookie(name, value, days) {
+            const expires = new Date(Date.now() + days * 864e5).toUTCString();
+            document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/';
+        }
+
+        function getCookie(name) {
+            return document.cookie.split('; ').reduce((r, v) => {
+                const parts = v.split('=');
+                return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+            }, '');
+        }
+
+        window.loadLayout = function(name) {
+            if (!name) return;
+
+            const layouts = JSON.parse(getCookie('layouts') || '{}');
+            const layout = layouts[name];
+            if (!layout) return;
+
+            clearTable();
+
+            layout.cards.forEach(cardData => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.left = cardData.left;
+                card.style.top = cardData.top;
+                card.dataset.model = cardData.model;
+                card.dataset.prompt = cardData.prompt;
+                card.dataset.inputsReceived = 0;
+                card.dataset.expectedInputs = 0;
+                card.dataset.responses = '';
+
+                const cardHeaderClass = cardData.type === 'llm' ? 'llm' : 'prompt';
+                const cardHeaderContent = cardData.type === 'llm' ? `
+                    <textarea class="prompt-area" placeholder="Enter prompt">${cardData.prompt}</textarea>
+                    <textarea class="message-area" placeholder="Enter your message">${cardData.message}</textarea>
+                    <button onclick="sendMessage(this.parentNode.parentNode)">Send</button>
+                    <div class="response-area"></div>
+                ` : `
+                    <input type="text" class="prompt-input" placeholder="Enter prompt" value="${cardData.prompt}">
+                    <input type="text" class="message-input" placeholder="Enter message" value="${cardData.message}">
+                    <button onclick="sendPrompt(this.parentNode.parentNode)">Send</button>
+                `;
+
+                card.innerHTML = `
+                    <div class="card-header ${cardHeaderClass}" onmousedown="startDragCard(event, this)">
+                        <span class="card-title">${cardData.type === 'llm' ? 'LLM Card' : 'Prompt Card'} ${cards.length + 1}</span>
+                        <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                    </div>
+                    <div class="card-body">
+                        ${cardHeaderContent}
+                    </div>
+                    <div class="connection-point input-point top-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="connection-point output-point top-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="connection-point input-point bottom-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="connection-point output-point bottom-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="connection-point input-point left-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="connection-point output-point left-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="connection-point input-point right-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="connection-point output-point right-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
+                    <div class="resize-button" onmousedown="startResize(event, this)"></div>
+                `;
+
+                canvas.appendChild(card);
+                cards.push(card);
+            });
+
+            layout.connections.forEach(connData => {
+                const from = cards[connData.from.cardIndex].querySelector(`.${connData.from.pointClass}`);
+                const to = cards[connData.to.cardIndex].querySelector(`.${connData.to.pointClass}`);
+                const connection = { from, to };
+                connections.push(connection);
+            });
+
+            updateExpectedInputs();
+            drawConnections();
+        }
+
+        window.deleteLayout = function(name) {
+            if (!name) return;
+
+            const layouts = JSON.parse(getCookie('layouts') || '{}');
+            delete layouts[name];
+            setCookie('layouts', JSON.stringify(layouts), 365);
+
+            updateLayoutList();
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initWebLLM();
+
+            // Event listener to show context menu on right-click
+            document.getElementById('canvas-container').addEventListener('contextmenu', showContextMenu);
+            document.addEventListener('click', hideContextMenu);
+
+            loadLayoutsFromCookies();
+            drawConnections();
+        });
+    </script>
+</body>
+</html>
