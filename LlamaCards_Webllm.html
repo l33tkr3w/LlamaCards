@@ -371,6 +371,7 @@
         let draggedPoint = null;
         let zoom = 1;
         let isPanning = false;
+        let isResizing = false; // Add this variable
         let startX, startY, offsetX = 0, offsetY = 0;
         let isDraggingCard = false;
         let currentDraggedCard = null;
@@ -389,7 +390,7 @@
                 console.log('Loading model:', progress);
             };
 
-            engine = await CreateMLCEngine('gemma-2-2b-it-q4f32_1-MLC', {
+            engine = await CreateMLCEngine('gemma-2-2b-it-q4f16_1-MLC', {
                 initProgressCallback
             });
 
@@ -420,7 +421,7 @@
 
         async function processCardMessage(card, message, engine, processedCards = new Set()) {
             if (processedCards.has(card)) {
-                //return; //Infinite loop allowed. uncomment to disable
+                //return;
             }
             processedCards.add(card);
 
@@ -476,7 +477,7 @@
 
             switch (type) {
                 case 'llm':
-                    card.dataset.model = 'gemma-2-2b-it-q4f32_1-MLC';
+                    card.dataset.model = 'gemma-2-2b-it-q4f16_1-MLC';
                     card.dataset.prompt = '';
                     card.dataset.message = '';
                     cardContent = `
@@ -705,13 +706,15 @@
         }
 
         window.zoom = function(event) {
-            event.preventDefault();
-            if (event.deltaY < 0) {
-                zoom *= 1.1;
-            } else {
-                zoom /= 1.1;
+            if (!isInsideCard(event)) {
+                event.preventDefault();
+                if (event.deltaY < 0) {
+                    zoom *= 1.1;
+                } else {
+                    zoom /= 1.1;
+                }
+                applyZoom();
             }
-            applyZoom();
         }
 
         window.applyZoom = function() {
@@ -720,7 +723,7 @@
         }
 
         window.startPan = function(event) {
-            if (event.button === 0) {  // Left mouse button
+            if (event.button === 0 && !isResizing && !isInsideCard(event)) { // Left mouse button, not resizing, and not inside a card
                 isPanning = true;
                 startX = event.clientX - offsetX;
                 startY = event.clientY - offsetY;
@@ -741,6 +744,10 @@
             canvasContainer.style.cursor = 'grab';
         }
 
+        function isInsideCard(event) {
+            return event.target.closest('.card') !== null;
+        }
+
         window.showContextMenu = function(event) {
             event.preventDefault();
             contextMenu.style.display = 'block';
@@ -754,6 +761,7 @@
 
         window.startResize = function(event, resizeButton) {
             event.stopPropagation();
+            isResizing = true; // Set the resizing flag
             const card = resizeButton.closest('.card');
             const startWidth = card.offsetWidth;
             const startHeight = card.offsetHeight;
@@ -775,6 +783,7 @@
             }
 
             function stopResize() {
+                isResizing = false; // Reset the resizing flag
                 document.removeEventListener('mousemove', resize);
                 document.removeEventListener('mouseup', stopResize);
             }
