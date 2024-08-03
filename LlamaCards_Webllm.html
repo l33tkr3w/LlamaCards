@@ -388,7 +388,7 @@
                 console.log('Loading model:', progress);
             };
 
-            engine = await CreateMLCEngine('gemma-2-2b-it-q4f16_1-MLC', {
+            engine = await CreateMLCEngine('gemma-2-2b-it-q4f32_1-MLC', {
                 initProgressCallback
             });
 
@@ -475,7 +475,7 @@
 
             switch (type) {
                 case 'llm':
-                    card.dataset.model = 'gemma-2-2b-it-q4f16_1-MLC';
+                    card.dataset.model = 'gemma-2-2b-it-q4f32_1-MLC';
                     card.dataset.prompt = '';
                     card.dataset.message = '';
                     cardContent = `
