@@ -2,3 +2,4 @@ aiohttp==3.9.5
 asyncio==3.4.3
 quart==0.19.6
 quart-cors==0.7.0
+httpx
