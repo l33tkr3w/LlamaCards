@@ -1,6 +1,6 @@
 # LlamaCards Web App
 
-LlamaCards is a web application that provides a dynamic interface for interacting with Large Language Models (LLMs) in real-time. This app allows users to create and connect cards, each representing different functionalities such as sending prompts and receiving responses from various language models.
+LlamaCards is a web application that provides a dynamic node-based interface for interacting with models in real-time. This app allows users to create and connect cards, each representing different functionalities such as sending prompts and receiving responses from various language models.
 
 ## Features
 
@@ -16,6 +16,7 @@ LlamaCards is a web application that provides a dynamic interface for interactin
 - **WebSockets**: For real-time, bidirectional communication between the server and clients.
 - **JavaScript**: For dynamic client-side interactions.
 - **HTML/CSS**: For structuring and styling the web interface.
+- **HTTPX**: Proxy server to prevent CORS issue when adjusting endpoint.
 
 ## Getting Started
 
