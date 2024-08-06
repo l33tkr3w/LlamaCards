@@ -369,7 +369,6 @@
         }
     </style>
 </head>
-
 <body>
     <div id="app">
         <div id="sidebar">
@@ -405,30 +404,24 @@
 
     <div id="settings-popup">
         <h3>Settings</h3>
-		<br>
         <label for="default-model-select">Default Model:</label>
         <select id="default-model-select" onchange="saveDefaultModel()"></select>
         <br>
-		<hr>
+        <hr>
         <label for="default-context-size-slider">Default Context Size:</label>
         <input type="range" id="default-context-size-slider" min="2048" max="131072" step="1024" value="2048" oninput="updateContextSizeDisplay(this.value)">
         <span id="context-size-display">2048</span>
         <br>
         <hr>
-		<label for="enable-default-context-size"> Enable Default Context Size</label>
-        <input type="checkbox" id="enable-default-context-size" onchange="saveDefaultContextSize()">   
+        <label for="enable-default-context-size"> Enable Default Context Size</label>
+        <input type="checkbox" id="enable-default-context-size" onchange="saveDefaultContextSize()">
+        <br>
+        <hr>
+        <label for="endpoint-input">Ollama Endpoint:</label>
+        <input type="text" id="endpoint-input" value="http://localhost:5000">
         <br>
         <button onclick="saveSettings()">Save</button>
         <button onclick="closeSettingsPopup()">Cancel</button>
-    </div>
-
-    <div id="endpoint-popup">
-        <h3>Ollama Endpoint Settings</h3>
-        <label for="endpoint-input">Ollama Endpoint:</label>
-        <input type="text" id="endpoint-input" value="http://localhost:8000">
-        <br>
-        <button onclick="saveEndpoint()">Save</button>
-        <button onclick="closeEndpointPopup()">Cancel</button>
     </div>
 
     <div id="card-settings-popup">
@@ -455,7 +448,7 @@
         const canvas = document.getElementById('canvas');
         const contextMenu = document.getElementById('context-menu');
         let currentSettingsCard = null;
-        let ollamaEndpoint = getCookie('ollamaEndpoint') || 'http://localhost:8000';
+        let ollamaEndpoint = getCookie('ollamaEndpoint') || 'http://192.168.0.27:11434';
         let modelList = [];
         let defaultModel = getCookie('defaultModel') || '';
         let defaultContextSize = getCookie('defaultContextSize') || 2048;
@@ -774,17 +767,10 @@
 
             card.classList.add('processing');
             try {
-                const responseStream = await queryOllama(model, combinedInput, contextSize);
-                let finalResponse = '';
-                for await (const response of responseStream) {
-                    console.log('Raw response:', response); // Log the raw response
-                    let parsedContent = extractMessageContent(response);
-                    if (parsedContent) {
-                        streamResponse(card, parsedContent);
-                        finalResponse += parsedContent;
-                    } else {
-                        streamResponse(card, response);
-                    }
+                const response = await queryOllama(model, combinedInput, contextSize);
+                let finalResponse = extractMessageContent(response);
+                if (finalResponse) {
+                    streamResponse(card, finalResponse);
                 }
                 card.classList.remove('processing');
 
@@ -811,7 +797,7 @@
             }
         }
 
-        async function* queryOllama(model, input, contextSize) {
+        async function queryOllama(model, input, contextSize) {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
@@ -823,7 +809,7 @@
                         role: 'user',
                         content: input
                     }],
-                    stream: true,
+                    stream: false,
                     context_size: contextSize,
                     endpoint: ollamaEndpoint // Pass the endpoint here
                 }),
@@ -833,19 +819,8 @@
                 throw new Error('Failed to get response from Ollama');
             }
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            while (true) {
-                const {
-                    done,
-                    value
-                } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, {
-                    stream: true
-                });
-                yield chunk;
-            }
+            const responseData = await response.json();
+            return JSON.stringify(responseData);
         }
 
         function streamResponse(card, response) {
@@ -974,6 +949,7 @@
             document.getElementById('default-context-size-slider').value = defaultContextSize;
             document.getElementById('context-size-display').innerText = defaultContextSize;
             document.getElementById('enable-default-context-size').checked = enableDefaultContextSize;
+            document.getElementById('endpoint-input').value = ollamaEndpoint; // Set the endpoint input value
             document.getElementById('settings-popup').style.display = 'block';
         }
 
@@ -987,9 +963,10 @@
             currentSettingsCard = null;
         }
 
-        function saveSettings() {
+        async function saveSettings() {
             saveDefaultModel();
             saveDefaultContextSize();
+            await saveEndpoint(); // Save endpoint changes
             closeSettingsPopup();
         }
 
@@ -1018,11 +995,25 @@
             document.getElementById('endpoint-popup').style.display = 'none';
         }
 
-        function saveEndpoint() {
+        async function saveEndpoint() {
             const newEndpoint = document.getElementById('endpoint-input').value.trim();
             if (newEndpoint) {
                 ollamaEndpoint = newEndpoint;
                 setCookie('ollamaEndpoint', ollamaEndpoint, 365);
+                try {
+                    const response = await fetch('/api/update-endpoint', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ endpoint: ollamaEndpoint }),
+                    });
+                    if (!response.ok) {
+                        throw new Error('Failed to update endpoint on server');
+                    }
+                } catch (error) {
+                    console.error('Error updating endpoint on server:', error);
+                }
                 fetchModels();
                 closeEndpointPopup();
             }
@@ -1237,5 +1228,4 @@
         initialize();
     </script>
 </body>
-
 </html>
