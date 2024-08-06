@@ -2,7 +2,6 @@ import json
 from quart import Quart, request, jsonify, render_template, send_from_directory, websocket, Response
 from quart_cors import cors
 import subprocess
-import asyncio
 import httpx
 import os
 
@@ -17,25 +16,27 @@ logging.basicConfig(level=logging.DEBUG)
 import tracemalloc
 tracemalloc.start()
 
-# Function to make a request to Ollama with streaming enabled
+# Global variable for Ollama endpoint
+ollama_endpoint = 'http://elitekrew.ddns.net:5000'
+
+# Function to make a request to Ollama without streaming
 async def query_ollama(model, messages, context_size, endpoint):
     url = f"{endpoint}/api/chat"
     headers = {"Content-Type": "application/json"}
     data = {
-        "model": model,
+        "model": model.strip(),  # Trim any extraneous spaces from model name
         "messages": messages,
         "stream": False,
         "context_size": context_size
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:  # Increase timeout to 60 seconds
         response = await client.post(url, json=data, headers=headers)
         if response.status_code != 200:
             app.logger.error(f"Failed to get a valid response from Ollama API: {response.status_code}")
             raise ValueError(f"Failed to get a valid response from Ollama API: {response.status_code}")
 
-        async for line in response.aiter_text():
-            yield line
+        return response.json()
 
 @app.route('/')
 async def index():
@@ -63,7 +64,7 @@ async def get_models():
 
         # Parse the result and extract model names
         lines = result.stdout.strip().split('\n')
-        models = [line.split('\t')[0] for line in lines if '\t' in line]
+        models = [line.split('\t')[0].strip() for line in lines if '\t' in line]  # Trim any extraneous spaces
         return jsonify(models)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -82,24 +83,27 @@ async def chat():
         model = data['model']
         messages = data['messages']
         context_size = data.get('context_size', 2048)
-        endpoint = data.get('endpoint', 'http://localhost:11434')
+        endpoint = data.get('endpoint', ollama_endpoint)
         
         app.logger.debug(f"Received request for model: {model} with messages: {messages}, context size: {context_size}, and endpoint: {endpoint}")
 
-        async def response_generator():
-            try:
-                async for chunk in query_ollama(model, messages, context_size, endpoint):
-                    yield chunk.encode('utf-8')  # Ensure bytes are yielded
-            except Exception as e:
-                app.logger.error(f"Error during response generation: {str(e)}")
-                yield json.dumps({"error": str(e)}).encode('utf-8')
-
-        return Response(response_generator(), content_type='application/json', headers={
-            'Access-Control-Allow-Origin': '*'
-        })
+        response_data = await query_ollama(model, messages, context_size, endpoint)
+        return jsonify(response_data), 200
     
     except Exception as e:
         app.logger.error(f"Error in chat endpoint: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/update-endpoint', methods=['POST'])
+async def update_endpoint():
+    global ollama_endpoint
+    try:
+        data = await request.json
+        ollama_endpoint = data['endpoint']
+        app.logger.debug(f"Updated Ollama endpoint to: {ollama_endpoint}")
+        return jsonify({"message": "Endpoint updated successfully"}), 200
+    except Exception as e:
+        app.logger.error(f"Error updating endpoint: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # WebSocket connection to handle real-time updates
