@@ -5,7 +5,7 @@ Features
 Interactive Node-Based Interface:
 
 Create, connect, and manage cards representing different functionalities.
-Drag-and-drop interface for easy customization of card layouts.
+Right-Click and select a card for easy customization layouts.
 Real-Time Processing:
 
 Concurrent processing of connected output cards.
@@ -45,40 +45,7 @@ WebSockets: For real-time, bidirectional communication between the server and cl
 JavaScript: For dynamic client-side interactions.
 HTML/CSS: For structuring and styling the web interface.
 HTTPX: Proxy server to handle CORS issues when adjusting endpoints.
-Getting Started
-Prerequisites
-Python 3.8 or higher
-pip (Python package installer)
-Installation
-Clone the Repository:
 
-bash
-Copy code
-git clone https://github.com/l33tkr3w/llamacards.git
-cd llamacards-webapp
-Create a virtual environment (optional but recommended):
-
-bash
-Copy code
-python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-Install Dependencies:
-
-bash
-Copy code
-pip install -r requirements.txt
-Running the Application
-Start the Quart Server:
-
-bash
-Copy code
-python LlamaCards.py
-Access the Web App: Open your web browser and navigate to http://localhost:5000.
-
-Usage
-Use the web interface to create and connect cards.
-Each card can interact with configured language and vision models, sending prompts and receiving real-time responses.
-Monitor and log all interactions for analysis and debugging.
 License
 This project is licensed under the MIT License.
 
