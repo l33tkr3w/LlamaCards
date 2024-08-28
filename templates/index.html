@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -98,6 +99,26 @@
             background-color: #7a3d00;
         }
 
+        .card-header.response-viewer {
+            background-color: #5a5a5a;
+        }
+
+        .card-header.vision {
+            background-color: #006400;
+        }
+
+        .card-header.repeater {
+            background-color: #8B0000;
+        }
+
+        .card-header.embedding {
+            background-color: #6a1b9a;
+        }
+
+        .card-header.rag {
+            background-color: #8b4513;
+        }
+
         .card-title {
             font-weight: bold;
         }
@@ -179,7 +200,8 @@
 
         textarea,
         .response-area,
-        input {
+        input,
+        select {
             width: 100%;
             background-color: #3c3c3c;
             color: #ffffff;
@@ -203,8 +225,7 @@
             margin: 0;
         }
 
-        button,
-        select {
+        button {
             background-color: #0e639c;
             color: white;
             border: none;
@@ -213,8 +234,7 @@
             cursor: pointer;
         }
 
-        button:hover,
-        select:hover {
+        button:hover {
             background-color: #1177bb;
         }
 
@@ -265,7 +285,7 @@
 
         @keyframes dash {
             to {
-                stroke-dashoffset: -5;
+                stroke-dashoffset: -64;
             }
         }
 
@@ -273,8 +293,8 @@
             stroke: #007acc;
             stroke-width: 2;
             fill: none;
-            stroke-dasharray: 5, 5;
-            animation: dash 0.25s linear infinite;
+            stroke-dasharray: 8, 8;
+            animation: dash 1s linear infinite;
         }
 
         .bottom-controls {
@@ -367,8 +387,56 @@
             display: flex;
             align-items: center;
         }
+
+        .file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            margin-top: 10px;
+            max-height: 75px;
+            overflow-y: auto;
+        }
+
+        .file-list-item {
+            background-color: #444;
+            padding: 5px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-list-item img {
+            max-width: 50px;
+            max-height: 50px;
+            margin-right: 10px;
+        }
+
+        .file-list-item span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 150px;
+        }
+
+        .webcam-preview {
+            width: 100%;
+            height: auto;
+            background-color: #222;
+            border: 1px solid #555;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .webcam-preview video {
+            width: 100%;
+            height: auto;
+        }
     </style>
 </head>
+
 <body>
     <div id="app">
         <div id="sidebar">
@@ -400,6 +468,11 @@
     <div id="context-menu" class="context-menu" style="display: none;">
         <div class="context-menu-item" onclick="createCard(event, 'llm')">LLM Card</div>
         <div class="context-menu-item" onclick="createCard(event, 'prompt')">Prompt Card</div>
+        <div class="context-menu-item" onclick="createCard(event, 'responseViewer')">Viewer Card</div>
+        <div class="context-menu-item" onclick="createCard(event, 'vision')">Vision Card</div>
+        <div class="context-menu-item" onclick="createCard(event, 'repeater')">Repeater Card</div>
+        <div class="context-menu-item" onclick="createCard(event, 'embedding')">Embedding Card</div>
+        <div class="context-menu-item" onclick="createCard(event, 'rag')">RAG Card</div>
     </div>
 
     <div id="settings-popup">
@@ -409,7 +482,8 @@
         <br>
         <hr>
         <label for="default-context-size-slider">Default Context Size:</label>
-        <input type="range" id="default-context-size-slider" min="2048" max="131072" step="1024" value="2048" oninput="updateContextSizeDisplay(this.value)">
+        <input type="range" id="default-context-size-slider" min="2048" max="131072" step="1024" value="2048"
+            oninput="updateContextSizeDisplay(this.value)">
         <span id="context-size-display">2048</span>
         <br>
         <hr>
@@ -427,7 +501,8 @@
     <div id="card-settings-popup">
         <h3>Card Settings</h3>
         <label for="context-size-slider">Context Size:</label>
-        <input type="range" id="context-size-slider" min="2048" max="131072" step="1024" value="2048" oninput="updateCardContextSizeDisplay(this.value)">
+        <input type="range" id="context-size-slider" min="2048" max="131072" step="1024" value="2048"
+            oninput="updateCardContextSizeDisplay(this.value)">
         <span id="card-context-size-display">2048</span>
         <br>
         <button onclick="saveCardSettings()">Save</button>
@@ -448,17 +523,20 @@
         const canvas = document.getElementById('canvas');
         const contextMenu = document.getElementById('context-menu');
         let currentSettingsCard = null;
-        let ollamaEndpoint = getCookie('ollamaEndpoint') || 'http://192.168.0.27:11434';
+        let ollamaEndpoint = getCookie('ollamaEndpoint') || 'http://localhost:5000';
         let modelList = [];
         let defaultModel = getCookie('defaultModel') || '';
         let defaultContextSize = getCookie('defaultContextSize') || 2048;
         let enableDefaultContextSize = getCookie('enableDefaultContextSize') === 'true';
+        let webcamStream = null;
+        let repeaterIntervals = {};
 
         async function fetchModels() {
             try {
                 const response = await fetch('/api/models');
                 if (response.ok) {
                     modelList = await response.json();
+                    defaultModel = defaultModel || modelList[0]; // Default to the first model in the list
                     updateModelDropdowns();
                     updateDefaultModelDropdown();
                 } else {
@@ -530,6 +608,7 @@
             card.dataset.inputsReceived = 0;
             card.dataset.expectedInputs = 0;
             card.dataset.responses = '';
+            card.dataset.cardId = `card-${Date.now()}`;
             let cardContent = '';
 
             switch (type) {
@@ -562,9 +641,94 @@
                             <button onclick="removeCard(this.parentNode.parentNode)">X</button>
                         </div>
                         <div class="card-body">
-                            <input type="text" class="prompt-input" placeholder="Enter prompt">
-                            <input type="text" class="message-input" placeholder="Enter message">
+                            <textarea class="prompt-input" placeholder="Enter prompt"></textarea>
+                            <textarea class="message-input" placeholder="Enter your message"></textarea>
                             <button onclick="sendPrompt(this.parentNode.parentNode)">Send</button>
+                        </div>`;
+                    break;
+                case 'responseViewer':
+                    cardContent = `
+                        <div class="card-header response-viewer" onmousedown="startDragCard(event, this)">
+                            <span class="card-title">Viewer Card ${cards.length + 1}</span>
+                            <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="response-area"></div>
+                            <label for="sendAfterResponses${cards.length}">Send after</label>
+                            <input type="number" id="sendAfterResponses${cards.length}" min="1" value="1" style="width: 50px;">
+                            <span>responses</span>
+                            <button onclick="sendResponseDownstream(this.parentNode.parentNode)">Send Response</button>
+                        </div>`;
+                    break;
+                case 'vision':
+                    card.dataset.mode = 'image';
+                    cardContent = `
+                        <div class="card-header vision" onmousedown="startDragCard(event, this)">
+                            <span class="card-title">Vision Card ${cards.length + 1}</span>
+                            <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                        </div>
+                        <div class="card-body">
+                            <label for="visionMode${cards.length}">Mode:</label>
+                            <select id="visionMode${cards.length}" onchange="updateVisionMode(this)">
+                                <option value="image">Image</option>
+                                <option value="webcam">Webcam</option>
+                            </select>
+                            <div class="vision-input">
+                                <input type="file" id="visionFile${cards.length}" multiple onchange="displaySelectedFiles(this)">
+                                <ul class="file-list" id="fileList${cards.length}"></ul>
+                            </div>
+                            <div class="webcam-preview" id="webcamPreview${cards.length}">
+                                <video id="webcamVideo${cards.length}" autoplay></video>
+                                <label for="snapshotTimer${cards.length}">Snapshot Timer (ms):</label>
+                                <input type="range" id="snapshotTimer${cards.length}" min="100" max="10000" step="100" value="1000"
+                                    oninput="updateSnapshotTimerDisplay(this)">
+                                <span id="snapshotTimerDisplay${cards.length}">1000</span>
+                                <label for="repeatToggle${cards.length}">Repeat:</label>
+                                <input type="checkbox" id="repeatToggle${cards.length}">
+                            </div>
+                            <button onclick="sendVisionData(this.parentNode.parentNode)">Send</button>
+                        </div>`;
+                    break;
+                case 'repeater':
+                    cardContent = `
+                        <div class="card-header repeater" onmousedown="startDragCard(event, this)">
+                            <span class="card-title">Repeater Card ${cards.length + 1}</span>
+                            <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                        </div>
+                        <div class="card-body">
+                            <label for="repeaterTimer${cards.length}">Timer (ms):</label>
+                            <input type="range" id="repeaterTimer${cards.length}" min="100" max="10000" step="100" value="1000"
+                                oninput="updateRepeaterTimerDisplay(this)">
+                            <span id="repeaterTimerDisplay${cards.length}">1000</span>
+                            <textarea class="prompt-area" placeholder="Enter prompt"></textarea>
+                            <textarea class="message-area" placeholder="Enter your message"></textarea>
+                            <button onclick="toggleRepeater(this.parentNode.parentNode)">Start</button>
+                        </div>`;
+                    break;
+                case 'embedding':
+                    cardContent = `
+                        <div class="card-header embedding" onmousedown="startDragCard(event, this)">
+                            <span class="card-title">Embedding Card ${cards.length + 1}</span>
+                            <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                        </div>
+                        <div class="card-body">
+                            <input type="text" class="table-name-input" placeholder="Enter table name">
+                            <textarea class="text-input" placeholder="Enter text to embed"></textarea>
+                            <button onclick="embedText(this.parentNode.parentNode)">Embed</button>
+                            <div class="response-area"></div>
+                        </div>`;
+                    break;
+                case 'rag':
+                    cardContent = `
+                        <div class="card-header rag" onmousedown="startDragCard(event, this)">
+                            <span class="card-title">RAG Card ${cards.length + 1}</span>
+                            <button onclick="removeCard(this.parentNode.parentNode)">X</button>
+                        </div>
+                        <div class="card-body">
+                            <textarea class="prompt-input" placeholder="Enter prompt"></textarea>
+                            <select class="table-select"></select>
+                            <button onclick="sendRAGRequest(this.parentNode.parentNode)">Send</button>
+                            <div class="response-area"></div>
                         </div>`;
                     break;
             }
@@ -584,10 +748,67 @@
             cards.push(card);
             updateExpectedInputs();
             hideContextMenu();
+
+            if (type === 'rag') {
+                loadTablesForRAGCard(card);
+            }
+        }
+
+        async function loadTablesForRAGCard(card) {
+            const tableSelect = card.querySelector('.table-select');
+            try {
+                const response = await fetch('/api/tables');
+                if (response.ok) {
+                    const tables = await response.json();
+                    tables.forEach(table => {
+                        const option = document.createElement('option');
+                        option.value = table;
+                        option.text = table;
+                        tableSelect.appendChild(option);
+                    });
+                } else {
+                    console.error('Failed to fetch tables');
+                }
+            } catch (error) {
+                console.error('Error fetching tables:', error);
+            }
+        }
+
+        async function sendRAGRequest(card) {
+            const promptInput = card.querySelector('.prompt-input').value.trim();
+            const tableSelect = card.querySelector('.table-select').value;
+            const responseArea = card.querySelector('.response-area');
+
+            if (promptInput && tableSelect) {
+                try {
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            prompt: promptInput,
+                            table_name: tableSelect,
+                        }),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        responseArea.innerHTML = `<pre>${data.response}</pre>`;
+                    } else {
+                        throw new Error('Failed to generate response');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    responseArea.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                }
+            } else {
+                responseArea.innerHTML = `<pre>Error: Prompt and table selection are required</pre>`;
+            }
         }
 
         function clearTable() {
-            cards.forEach(card => card.remove());
+            cards.forEach(card => removeCard(card));
             cards = [];
             connections = [];
             connectionsSVG.innerHTML = '';
@@ -619,6 +840,8 @@
         }
 
         function removeCard(card) {
+            clearInterval(repeaterIntervals[card.dataset.cardId]);
+            delete repeaterIntervals[card.dataset.cardId];
             connections = connections.filter(conn => conn.from.closest('.card') !== card && conn.to.closest('.card') !== card);
             cards = cards.filter(c => c !== card);
             card.remove();
@@ -749,29 +972,38 @@
                 const message = textarea.value.trim();
                 if (message) {
                     await processCardMessage(card, message);
-                    textarea.value = '';
+                    textarea.value = ''; // Comment this line if you don't want to clear the input field
                 }
             }
         }
 
-        async function processCardMessage(card, message, processedCards = new Set()) {
-            if (processedCards.has(card)) {
-                // Allow continuous loop
-            }
-            processedCards.add(card);
-
+        async function processCardMessage(card, message, images = []) {
             const model = card.dataset.model || '';
             const prompt = card.dataset.prompt || '';
-            const contextSize = enableDefaultContextSize ? defaultContextSize : (card.dataset.contextSize || 2048); // Use the defined context size
+            const contextSize = enableDefaultContextSize ? defaultContextSize : (card.dataset.contextSize || 2048);
             let combinedInput = `${prompt}${message}`;
+            if (!combinedInput) combinedInput = "what is in this image?";
 
             card.classList.add('processing');
             try {
-                const response = await queryOllama(model, combinedInput, contextSize);
-                let finalResponse = extractMessageContent(response);
-                if (finalResponse) {
-                    streamResponse(card, finalResponse);
+                let finalResponse;
+                const cardHeader = card.querySelector('.card-header');
+
+                if (cardHeader && cardHeader.classList.contains('llm')) {
+                    const response = await queryOllama(model, combinedInput, contextSize, images);
+                    finalResponse = extractMessageContent(response);
+                    if (finalResponse) {
+                        appendResponse(card, finalResponse);
+                    }
+                } else if (cardHeader && cardHeader.classList.contains('response-viewer')) {
+                    finalResponse = message;
+                    appendResponse(card, finalResponse);
+                } else if (cardHeader && cardHeader.classList.contains('embedding')) {
+                    finalResponse = message;
+                    appendResponse(card, finalResponse);
+                    await embedResponseInCard(card, finalResponse);
                 }
+
                 card.classList.remove('processing');
 
                 const connectedCards = connections
@@ -779,40 +1011,79 @@
                     .map(conn => conn.to.closest('.card'));
 
                 if (connectedCards.length > 0) {
-                    await Promise.all(connectedCards.map(async nextCard => {
-                        nextCard.dataset.inputsReceived++;
-                        nextCard.dataset.responses += finalResponse + '\n';
-                        if (parseInt(nextCard.dataset.inputsReceived, 10) >= parseInt(nextCard.dataset.expectedInputs, 10)) {
-                            const combinedResponse = nextCard.dataset.responses.trim();
-                            nextCard.dataset.responses = '';
-                            nextCard.dataset.inputsReceived = 0;
-                            await processCardMessage(nextCard, combinedResponse, processedCards);
-                        }
-                    }));
+                    await Promise.all(
+                        connectedCards.map(async (nextCard) => {
+                            nextCard.dataset.inputsReceived++;
+                            nextCard.dataset.responses += finalResponse + '\n';
+
+                            if (parseInt(nextCard.dataset.inputsReceived, 10) >= nextCard.dataset.expectedInputs) {
+                                const combinedResponse = nextCard.dataset.responses.trim();
+                                nextCard.dataset.responses = '';
+                                nextCard.dataset.inputsReceived = 0;
+                                await processCardMessage(nextCard, combinedResponse, images);
+                            }
+                        })
+                    );
                 }
             } catch (error) {
                 console.error('Error processing message:', error);
-                streamResponse(card, `Error: Unable to process message. Error details: ${error.message}`);
+                appendResponse(card, `Error: Unable to process message. Error details: ${error.message}`);
                 card.classList.remove('processing');
             }
         }
 
-        async function queryOllama(model, input, contextSize) {
+        async function embedResponseInCard(embeddingCard, responseText) {
+            const tableNameInput = embeddingCard.querySelector('.table-name-input');
+            const responseArea = embeddingCard.querySelector('.response-area');
+
+            const tableName = tableNameInput.value.trim();
+
+            if (tableName && responseText) {
+                embeddingCard.classList.add('processing'); // Start animation
+                try {
+                    const response = await fetch('/api/embed', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ table_name: tableName, text: responseText }),
+                    });
+
+                    if (response.ok) {
+                        const responseData = await response.json();
+                        responseArea.innerHTML = `<pre>${responseData.message}</pre>`;
+                    } else {
+                        throw new Error('Failed to embed response');
+                    }
+                } catch (error) {
+                    console.error('Error embedding response:', error);
+                    responseArea.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                } finally {
+                    embeddingCard.classList.remove('processing'); // End animation
+                }
+            } else {
+                responseArea.innerHTML = `<pre>Error: Table name cannot be empty</pre>`;
+            }
+        }
+
+        async function queryOllama(model, input, contextSize, images = []) {
+            const payload = {
+                model: model,
+                messages: [{
+                    role: 'user',
+                    content: input,
+                    images: images
+                }],
+                stream: false,
+                context_size: contextSize,
+                endpoint: ollamaEndpoint
+            };
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    model: model,
-                    messages: [{
-                        role: 'user',
-                        content: input
-                    }],
-                    stream: false,
-                    context_size: contextSize,
-                    endpoint: ollamaEndpoint // Pass the endpoint here
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
@@ -823,10 +1094,11 @@
             return JSON.stringify(responseData);
         }
 
-        function streamResponse(card, response) {
+        function appendResponse(card, response) {
             const outputArea = card.querySelector('.response-area');
             if (outputArea) {
-                outputArea.innerHTML += `<pre>${response}</pre>`;
+                const existingContent = outputArea.innerHTML;
+                outputArea.innerHTML = existingContent + `<pre>${response}</pre>`;
                 outputArea.scrollTop = outputArea.scrollHeight;
             }
         }
@@ -877,6 +1149,229 @@
                 }
                 sendMessage(nextCard);
             });
+        }
+
+        function updateVisionMode(select) {
+            const card = select.closest('.card');
+            const visionInput = card.querySelector('.vision-input');
+            const webcamPreview = card.querySelector('.webcam-preview');
+
+            if (select.value === 'image') {
+                visionInput.style.display = 'block';
+                webcamPreview.style.display = 'none';
+                if (webcamStream) {
+                    const video = webcamPreview.querySelector('video');
+                    video.srcObject = null;
+                    webcamStream.getTracks().forEach(track => track.stop());
+                    webcamStream = null;
+                }
+            } else {
+                visionInput.style.display = 'none';
+                webcamPreview.style.display = 'block';
+                startWebcam(card);
+            }
+        }
+
+        function displaySelectedFiles(input) {
+            const fileList = input.nextElementSibling;
+            fileList.innerHTML = '';
+
+            Array.from(input.files).forEach(file => {
+                const listItem = document.createElement('li');
+                listItem.className = 'file-list-item';
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                listItem.appendChild(img);
+                const span = document.createElement('span');
+                span.textContent = file.name;
+                listItem.appendChild(span);
+                fileList.appendChild(listItem);
+            });
+        }
+
+        function startWebcam(card) {
+            const webcamPreview = card.querySelector('.webcam-preview');
+            const video = webcamPreview.querySelector('video');
+            const timerInput = webcamPreview.querySelector('input[type="range"]');
+            const repeatToggle = webcamPreview.querySelector('input[type="checkbox"]');
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    webcamStream = stream;
+                    video.srcObject = stream;
+                })
+                .catch(error => {
+                    console.error('Error accessing webcam:', error);
+                });
+
+            repeatToggle.addEventListener('change', () => {
+                if (repeatToggle.checked) {
+                    startSnapshotTimer(card, parseInt(timerInput.value, 10));
+                } else {
+                    stopSnapshotTimer(card);
+                }
+            });
+        }
+
+        function takeSnapshot(card) {
+            const video = card.querySelector('video');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/png').replace(/^data:image\/(png|jpeg);base64,/, '');
+
+            const connectedCards = connections.filter(conn => conn.from.closest('.card') === card);
+            if (connectedCards.length > 0) {
+                forwardVisionData(card, dataUrl);
+            }
+        }
+
+        function startSnapshotTimer(card, interval) {
+            const cardId = card.dataset.cardId;
+
+            if (repeaterIntervals[cardId]) {
+                clearInterval(repeaterIntervals[cardId]);
+            }
+
+            repeaterIntervals[cardId] = setInterval(() => {
+                takeSnapshot(card);
+            }, interval);
+
+            const timerInput = card.querySelector('.webcam-preview input[type="range"]');
+            timerInput.addEventListener('input', () => {
+                clearInterval(repeaterIntervals[cardId]);
+                repeaterIntervals[cardId] = setInterval(() => {
+                    takeSnapshot(card);
+                }, parseInt(timerInput.value, 10));
+            });
+        }
+
+        function stopSnapshotTimer(card) {
+            const cardId = card.dataset.cardId;
+            if (repeaterIntervals[cardId]) {
+                clearInterval(repeaterIntervals[cardId]);
+                delete repeaterIntervals[cardId];
+            }
+        }
+
+        async function sendVisionData(card) {
+            const visionModeSelect = card.querySelector('select');
+            if (visionModeSelect) {
+                const visionMode = visionModeSelect.value;
+                if (visionMode === 'image') {
+                    const fileInput = card.querySelector('input[type="file"]');
+                    if (fileInput && fileInput.files) {
+                        for (const file of fileInput.files) {
+                            const dataUrl = await readFileAsDataUrl(file);
+                            await processCardMessageSequentially(card, "", [dataUrl]);
+                        }
+                    }
+                } else if (visionMode === 'webcam') {
+                    takeSnapshot(card);
+                }
+            }
+        }
+
+        async function processCardMessageSequentially(card, message, images = []) {
+            const model = card.dataset.model || '';
+            const prompt = card.dataset.prompt || '';
+            const contextSize = enableDefaultContextSize ? defaultContextSize : (card.dataset.contextSize || 2048);
+            let combinedInput = `${prompt}${message}`;
+            if (!combinedInput) combinedInput = "what is in this image?";
+
+            card.classList.add('processing');
+            try {
+                let finalResponse;
+                const cardHeader = card.querySelector('.card-header');
+                if (cardHeader && cardHeader.classList.contains('llm')) {
+                    const response = await queryOllama(model, combinedInput, contextSize, images);
+                    finalResponse = extractMessageContent(response);
+                    if (finalResponse) {
+                        appendResponse(card, finalResponse);
+                    }
+                } else if (cardHeader && cardHeader.classList.contains('response-viewer')) {
+                    finalResponse = message;
+                    appendResponse(card, finalResponse);
+                } else if (cardHeader && cardHeader.classList.contains('embedding')) {
+                    finalResponse = message;
+                    appendResponse(card, finalResponse);
+                    await embedResponseInCard(card, finalResponse);
+                }
+                card.classList.remove('processing');
+
+                const connectedCards = connections
+                    .filter(conn => conn.from.closest('.card') === card)
+                    .map(conn => conn.to.closest('.card'));
+
+                for (const nextCard of connectedCards) {
+                    nextCard.dataset.inputsReceived++;
+                    nextCard.dataset.responses += finalResponse + '\n';
+                    if (parseInt(nextCard.dataset.inputsReceived, 10) >= nextCard.dataset.expectedInputs) {
+                        const combinedResponse = nextCard.dataset.responses.trim();
+                        nextCard.dataset.responses = '';
+                        nextCard.dataset.inputsReceived = 0;
+                        await processCardMessageSequentially(nextCard, combinedResponse, images);
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing message:', error);
+                appendResponse(card, `Error: Unable to process message. Error details: ${error.message}`);
+                card.classList.remove('processing');
+            }
+        }
+
+        function readFileAsDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.replace(/^data:image\/(png|jpeg);base64,/, ''));
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function forwardVisionData(card, dataUrl) {
+            const connectedCards = connections
+                .filter(conn => conn.from.closest('.card') === card)
+                .map(conn => conn.to.closest('.card'));
+
+            connectedCards.forEach(nextCard => {
+                nextCard.dataset.imagePath = dataUrl;
+                processCardMessage(nextCard, "", [dataUrl]);
+            });
+        }
+
+        function toggleRepeater(card) {
+            const timerInput = card.querySelector('input[type="range"]');
+            const promptArea = card.querySelector('.prompt-area');
+            const messageArea = card.querySelector('.message-area');
+            const button = card.querySelector('button');
+            const interval = parseInt(timerInput.value, 10);
+            const cardId = card.dataset.cardId;
+
+            if (repeaterIntervals[cardId]) {
+                clearInterval(repeaterIntervals[cardId]);
+                delete repeaterIntervals[cardId];
+                button.textContent = 'Start';
+            } else {
+                repeaterIntervals[cardId] = setInterval(() => {
+                    const prompt = promptArea.value.trim();
+                    const message = messageArea.value.trim();
+                    processCardMessage(card, `${prompt}${message}`);
+                }, interval);
+                button.textContent = 'Stop';
+            }
+        }
+
+        function updateSnapshotTimerDisplay(rangeInput) {
+            const displaySpan = rangeInput.nextElementSibling;
+            displaySpan.textContent = rangeInput.value;
+        }
+
+        function updateRepeaterTimerDisplay(rangeInput) {
+            const displaySpan = rangeInput.nextElementSibling;
+            displaySpan.textContent = rangeInput.value;
         }
 
         function zoomIn() {
@@ -949,7 +1444,7 @@
             document.getElementById('default-context-size-slider').value = defaultContextSize;
             document.getElementById('context-size-display').innerText = defaultContextSize;
             document.getElementById('enable-default-context-size').checked = enableDefaultContextSize;
-            document.getElementById('endpoint-input').value = ollamaEndpoint; // Set the endpoint input value
+            document.getElementById('endpoint-input').value = ollamaEndpoint;
             document.getElementById('settings-popup').style.display = 'block';
         }
 
@@ -966,7 +1461,7 @@
         async function saveSettings() {
             saveDefaultModel();
             saveDefaultContextSize();
-            await saveEndpoint(); // Save endpoint changes
+            await saveEndpoint();
             closeSettingsPopup();
         }
 
@@ -984,15 +1479,6 @@
 
         function updateCardContextSizeDisplay(value) {
             document.getElementById('card-context-size-display').innerText = value;
-        }
-
-        function showEndpointPopup() {
-            document.getElementById('endpoint-input').value = ollamaEndpoint;
-            document.getElementById('endpoint-popup').style.display = 'block';
-        }
-
-        function closeEndpointPopup() {
-            document.getElementById('endpoint-popup').style.display = 'none';
         }
 
         async function saveEndpoint() {
@@ -1079,7 +1565,13 @@
 
             const layoutData = {
                 cards: cards.map(card => ({
-                    type: card.querySelector('.card-header').classList.contains('llm') ? 'llm' : 'prompt',
+                    type: card.querySelector('.card-header').classList.contains('llm') ? 'llm' :
+                        card.querySelector('.card-header').classList.contains('prompt') ? 'prompt' :
+                            card.querySelector('.card-header').classList.contains('response-viewer') ? 'responseViewer' :
+                                card.querySelector('.card-header').classList.contains('vision') ? 'vision' :
+                                    card.querySelector('.card-header').classList.contains('embedding') ? 'embedding' :
+                                        card.querySelector('.card-header').classList.contains('rag') ? 'rag' :
+                                            'repeater',
                     left: card.style.left,
                     top: card.style.top,
                     model: card.dataset.model || '',
@@ -1098,134 +1590,99 @@
                 }))
             };
 
-            const layouts = JSON.parse(getCookie('layouts') || '{}');
-            layouts[layoutName] = layoutData;
-            setCookie('layouts', JSON.stringify(layouts), 365);
-
-            updateLayoutList();
+            setCookie(`layout_${layoutName}`, JSON.stringify(layoutData), 365);
             document.getElementById('save-layout-popup').style.display = 'none';
-        }
-
-        function loadLayout(name) {
-            if (!name) return;
-
-            const layouts = JSON.parse(getCookie('layouts') || '{}');
-            const layout = layouts[name];
-            if (!layout) return;
-
-            clearTable();
-
-            layout.cards.forEach(cardData => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.style.left = cardData.left;
-                card.style.top = cardData.top;
-                card.dataset.model = cardData.model;
-                card.dataset.prompt = cardData.prompt;
-                card.dataset.inputsReceived = 0;
-                card.dataset.expectedInputs = 0;
-                card.dataset.responses = '';
-
-                const cardHeaderClass = cardData.type === 'llm' ? 'llm' : 'prompt';
-                const cardHeaderContent = cardData.type === 'llm' ? `
-                    <label for="modelSelect${cards.length}">Model</label>
-                    <select id="modelSelect${cards.length}" onchange="updateCardModel(this)">
-                        ${modelList.map(model => model !== 'NAME' ? `<option value="${model}" ${model === cardData.model ? 'selected' : ''}>${model}</option>` : '').join('')}
-                    </select>
-                    <textarea class="prompt-area" placeholder="Enter prompt">${cardData.prompt}</textarea>
-                    <textarea class="message-area" placeholder="Enter your message">${cardData.message}</textarea>
-                    <button onclick="sendMessage(this.parentNode.parentNode)">Send</button>
-                    <div class="response-area"></div>
-                 ` : `
-                    <input type="text" class="prompt-input" placeholder="Enter prompt" value="${cardData.prompt}">
-                    <input type="text" class="message-input" placeholder="Enter message" value="${cardData.message}">
-                    <button onclick="sendPrompt(this.parentNode.parentNode)">Send</button>
-                `;
-
-                card.innerHTML = `
-                    <div class="card-header ${cardHeaderClass}" onmousedown="startDragCard(event, this)">
-                        <span class="card-title">${cardData.type === 'llm' ? 'LLM Card' : 'Prompt Card'} ${cards.length + 1}</span>
-                        <div class="gear-icon" onclick="showCardSettingsPopup(this.parentNode.parentNode)">⚙</div>
-                        <button onclick="removeCard(this.parentNode.parentNode)">X</button>
-                    </div>
-                    <div class="card-body">
-                        ${cardHeaderContent}
-                    </div>
-                    <div class="connection-point input-point top-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="connection-point output-point top-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="connection-point input-point bottom-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="connection-point output-point bottom-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="connection-point input-point left-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="connection-point output-point left-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="connection-point input-point right-input-point" onmousedown="startDrag(event, 'input')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="connection-point output-point right-output-point" onmousedown="startDrag(event, 'output')" ondblclick="disconnectDot(event, this)"></div>
-                    <div class="resize-button" onmousedown="startResize(event, this)"></div>
-                `;
-
-                canvas.appendChild(card);
-                cards.push(card);
-            });
-
-            layout.connections.forEach(connData => {
-                const from = cards[connData.from.cardIndex].querySelector(`.${connData.from.pointClass}`);
-                const to = cards[connData.to.cardIndex].querySelector(`.${connData.to.pointClass}`);
-                const connection = {
-                    from,
-                    to
-                };
-                connections.push(connection);
-            });
-
-            updateExpectedInputs();
-            drawConnections();
-        }
-
-        function deleteLayout(name) {
-            if (!name) return;
-
-            const layouts = JSON.parse(getCookie('layouts') || '{}');
-            delete layouts[name];
-            setCookie('layouts', JSON.stringify(layouts), 365);
-
-            updateLayoutList();
-        }
-
-        function updateLayoutList() {
-            const layouts = JSON.parse(getCookie('layouts') || '{}');
-            const layoutList = document.getElementById('layout-list');
-            layoutList.innerHTML = '';
-
-            Object.keys(layouts).forEach(name => {
-                const listItem = document.createElement('li');
-                listItem.className = 'layout-list-item';
-                listItem.innerHTML = `
-                    <span>${name}</span>
-                    <div>
-                        <button onclick="loadLayout('${name}')">Load</button>
-                        <button onclick="deleteLayout('${name}')">Delete</button>
-                    </div>
-                `;
-                layoutList.appendChild(listItem);
-            });
+            loadLayoutsFromCookies();
         }
 
         function loadLayoutsFromCookies() {
-            updateLayoutList();
+            const layoutList = document.getElementById('layout-list');
+            layoutList.innerHTML = '';
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('layout_')) {
+                    const layoutName = key.slice('layout_'.length);
+                    const listItem = document.createElement('li');
+                    listItem.className = 'layout-list-item';
+
+                    const span = document.createElement('span');
+                    span.textContent = layoutName;
+                    listItem.appendChild(span);
+
+                    const loadButton = document.createElement('button');
+                    loadButton.textContent = 'Load';
+                    loadButton.onclick = () => loadLayout(layoutName);
+                    listItem.appendChild(loadButton);
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Delete';
+                    deleteButton.onclick = () => deleteLayout(layoutName);
+                    listItem.appendChild(deleteButton);
+
+                    layoutList.appendChild(listItem);
+                }
+            }
+        }
+
+        function loadLayout(layoutName) {
+            clearTable();
+            const layoutData = JSON.parse(localStorage.getItem(`layout_${layoutName}`));
+
+            layoutData.cards.forEach(cardData => {
+                const event = { clientX: 0, clientY: 0 }; // Placeholder event object
+                createCard(event, cardData.type);
+                const newCard = cards[cards.length - 1];
+                newCard.style.left = cardData.left;
+                newCard.style.top = cardData.top;
+                newCard.dataset.model = cardData.model;
+                newCard.dataset.prompt = cardData.prompt;
+                const messageArea = newCard.querySelector('.message-area');
+                if (messageArea) {
+                    messageArea.value = cardData.message;
+                }
+            });
+
+            layoutData.connections.forEach(connData => {
+                const fromCard = cards[connData.from.cardIndex];
+                const toCard = cards[connData.to.cardIndex];
+                const fromPoint = fromCard.querySelector(`.${connData.from.pointClass}`);
+                const toPoint = toCard.querySelector(`.${connData.to.pointClass}`);
+
+                connections.push({
+                    from: fromPoint,
+                    to: toPoint
+                });
+            });
+
+            drawConnections();
+        }
+
+        function deleteLayout(layoutName) {
+            localStorage.removeItem(`layout_${layoutName}`);
+            loadLayoutsFromCookies();
         }
 
         function setCookie(name, value, days) {
-            const expires = new Date(Date.now() + days * 864e5).toUTCString();
-            document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/';
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = `expires=${date.toUTCString()}`;
+            document.cookie = `${name}=${value};${expires};path=/`;
         }
 
         function getCookie(name) {
-            return document.cookie.split('; ').reduce((r, v) => {
-                const parts = v.split('=');
-                return parts[0] === name ? decodeURIComponent(parts[1]) : r;
-            }, '');
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.indexOf(`${name}=`) === 0) {
+                    return cookie.substring(name.length + 1, cookie.length);
+                }
+            }
+            return '';
         }
 
         initialize();
     </script>
 </body>
+
 </html>
