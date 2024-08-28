@@ -1,75 +1,89 @@
-# LlamaCards Web App
+LlamaCards Web App
+LlamaCards is a versatile web application that offers a dynamic node-based interface for real-time interaction with various language and vision models. The app allows users to create, connect, and manage cards representing different functionalities, making it a powerful tool for customizing and controlling interactions with models hosted within Ollama.
 
-LlamaCards is a web application that provides a dynamic node-based interface for interacting with models in real-time. This app allows users to create and connect cards, each representing different functionalities such as sending prompts and receiving responses from various language models.
+Features
+Interactive Node-Based Interface:
 
-## Features
+Create, connect, and manage cards representing different functionalities.
+Drag-and-drop interface for easy customization of card layouts.
+Real-Time Processing:
 
-- **Interactive Cards**: Create and manage cards that interact with different language models.
-- **Real-time Communication**: Utilizes WebSocket connections to handle real-time updates and interactions.
-- **Customizable Models**: Easily switch between different language models for varied responses.
-- **Detailed Logging**: Comprehensive logging to debug and monitor the application's performance.
+Concurrent processing of connected output cards.
+Sequential processing of input cards to ensure data integrity.
+Handles real-time updates and interactions using WebSockets.
+Customizable Models:
 
-## Technologies Used
+Switch between different language and vision models with ease.
+Supports a variety of models hosted within Ollama.
+Embedding and Retrieval-Augmented Generation (RAG):
 
-- **Quart**: A Python ASGI web framework based on Flask.
-- **aiohttp**: Asynchronous HTTP client/server framework.
-- **WebSockets**: For real-time, bidirectional communication between the server and clients.
-- **JavaScript**: For dynamic client-side interactions.
-- **HTML/CSS**: For structuring and styling the web interface.
-- **HTTPX**: Proxy server to prevent CORS issue when adjusting endpoint.
+Embed text into a database for later retrieval.
+Use the RAG card to combine prompts with stored data for enhanced responses.
+Vision Card:
 
-## Getting Started
+Supports image input from files or webcam streams.
+Processes images and provides descriptions or analyses in real-time.
+Repeater Card:
 
-### Prerequisites
+Automate sending prompts at specified intervals.
+Ideal for recurring tasks or monitoring applications.
+Comprehensive Logging:
 
-- Python 3.8 or higher
-- pip (Python package installer)
+Detailed logging for debugging and monitoring the application’s performance.
+Dynamic Connections:
 
-### Installation
+Cards connected to multiple outputs process concurrently.
+Cards with multiple input connections wait for all inputs to complete before processing.
+User-Friendly Settings:
 
-1. **Clone the Repository**:
-    bash
-    git clone https://github.com/l33tkr3w/llamacards.git
-    cd llamacards-webapp
-    
+Customize default model, context size, and other settings directly from the web interface.
+Save and load card layouts for easy reuse.
+Technologies Used
+Quart: A Python ASGI web framework based on Flask.
+aiohttp: Asynchronous HTTP client/server framework.
+WebSockets: For real-time, bidirectional communication between the server and clients.
+JavaScript: For dynamic client-side interactions.
+HTML/CSS: For structuring and styling the web interface.
+HTTPX: Proxy server to handle CORS issues when adjusting endpoints.
+Getting Started
+Prerequisites
+Python 3.8 or higher
+pip (Python package installer)
+Installation
+Clone the Repository:
 
-2. **Create a virtual environment** (optional but recommended):
-    bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    
+bash
+Copy code
+git clone https://github.com/l33tkr3w/llamacards.git
+cd llamacards-webapp
+Create a virtual environment (optional but recommended):
 
-3. **Install Dependencies**:
-    bash
-    pip install -r requirements.txt
-    
+bash
+Copy code
+python -m venv venv
+source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+Install Dependencies:
 
-### Running the Application
+bash
+Copy code
+pip install -r requirements.txt
+Running the Application
+Start the Quart Server:
 
-1. **Start the Quart Server**:
-    bash
-    python LlamaCards.py
-    
+bash
+Copy code
+python LlamaCards.py
+Access the Web App: Open your web browser and navigate to http://localhost:5000.
 
-2. **Access the Web App**:
-    Open your web browser and navigate to `http://localhost:5000`.
-
-### Usage
-
-- Create and connect cards in the web interface.
-- Each card can send prompts and receive responses from the configured language model.
-- Monitor real-time interactions and responses.
-
-
-## License
-
+Usage
+Use the web interface to create and connect cards.
+Each card can interact with configured language and vision models, sending prompts and receiving real-time responses.
+Monitor and log all interactions for analysis and debugging.
+License
 This project is licensed under the MIT License.
 
-## Contributing
+Contributing
+Contributions are welcome! Please submit a Pull Request or open an Issue for any bugs or feature requests.
 
-Contributions are welcome! Please feel free to submit a Pull Request or open an Issue for any bugs or feature requests.
-
-## Contact
-
-For any questions or inquiries, please contact [blackhatworks@gmail.com](mailto:blackhatworks@gmail.com).
-
+Contact
+For any questions or inquiries, please contact blackhatworks@gmail.com.
