@@ -1363,6 +1363,40 @@
                 button.textContent = 'Stop';
             }
         }
+		
+		async function embedText(card) {
+		const tableNameInput = card.querySelector('.table-name-input');
+		const textInput = card.querySelector('.text-input');
+		const responseArea = card.querySelector('.response-area');
+
+		const tableName = tableNameInput.value.trim();
+		const text = textInput.value.trim();
+
+    if (tableName && text) {
+        try {
+            const response = await fetch('/api/embed', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ table_name: tableName, text: text }),
+            });
+
+            if (response.ok) {
+                const responseData = await response.json();
+                responseArea.innerHTML = `<pre>${responseData.message}</pre>`;
+            } else {
+                throw new Error('Failed to embed text');
+            }
+        } catch (error) {
+            console.error('Error embedding text:', error);
+            responseArea.innerHTML = `<pre>Error: ${error.message}</pre>`;
+        }
+    } else {
+        responseArea.innerHTML = `<pre>Error: Table name and text cannot be empty</pre>`;
+    }
+}
+
 
         function updateSnapshotTimerDisplay(rangeInput) {
             const displaySpan = rangeInput.nextElementSibling;
